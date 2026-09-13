@@ -9,7 +9,6 @@ import android.widget.MediaController
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
-import android.widget.VideoView
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
 
@@ -31,8 +30,14 @@ class PlayerActivity : AppCompatActivity() {
     // trình phát phải chạy CHẬM LẠI đúng 10 lần: 1 ÷ 10 = 0.1 - đây mới là tốc độ tương ứng với
     // "1x" thật sự (không phải 1.0 của trình phát). "2x" (nhanh gấp đôi tốc độ thật) tương ứng
     // 0.1 × 2 = 0.2.
-    private val REAL_1X = 0.1f
-    private val REAL_2X = 0.2f
+    //
+    // Hệ số này (10) PHẢI khớp với forceSpeed(...) bên app quay - dùng chung 1 hằng số ở đây rồi
+    // suy ra REAL_1X/REAL_2X, đồng thời gán sang SpeedAdjustedVideoView (xem onCreate bên dưới)
+    // để tổng thời lượng + 2 nút tua tới/lui trên thanh điều khiển cũng tự quy đổi đúng theo thời
+    // gian thật, không còn tính theo thời gian gốc (đã nén) của file nữa.
+    private val RECORD_SPEED_FACTOR = 10
+    private val REAL_1X = 1f / RECORD_SPEED_FACTOR
+    private val REAL_2X = REAL_1X * 2f
     // Mặc định LUÔN mở video ở tốc độ thật 1x (0.1x của trình phát) - "2x" chỉ là lựa chọn xem
     // nhanh, bấm thêm mới bật.
     private var is2x = false
@@ -41,9 +46,15 @@ class PlayerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
 
-        val videoView = findViewById<VideoView>(R.id.videoView)
+        val videoView = findViewById<SpeedAdjustedVideoView>(R.id.videoView)
         val progressBar = findViewById<ProgressBar>(R.id.progressBar)
         val btnSpeed = findViewById<TextView>(R.id.btnSpeed)
+
+        // Tổng thời lượng, vị trí hiện tại, và 2 nút tua tới/lui trên MediaController mặc định sẽ
+        // tự lấy qua getDuration()/getCurrentPosition()/seekTo() đã bị ghi đè trong
+        // SpeedAdjustedVideoView - gán hệ số NGAY TỪ ĐẦU (trước khi MediaController được tạo/dùng
+        // tới) để không có lúc nào các hàm đó vô tình trả về thời gian gốc (chưa quy đổi).
+        videoView.speedFactor = RECORD_SPEED_FACTOR
 
         videoPath = intent.getStringExtra(EXTRA_VIDEO_PATH)
         title = intent.getStringExtra(EXTRA_TITLE)
