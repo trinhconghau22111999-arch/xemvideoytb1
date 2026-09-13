@@ -51,6 +51,25 @@
         android:paddingTop="8dp"
         android:paddingBottom="8dp">
 
+        <!-- Tua lùi 2.5 giây mỗi lần bấm (không phải giữ nút) - xem seekRelative() trong
+             PlayerActivity.kt. -->
+        <TextView
+            android:id="@+id/btnSeekBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="⏪"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:shadowColor="#000000"
+            android:shadowDx="0"
+            android:shadowDy="0"
+            android:shadowRadius="4" />
+
         <TextView
             android:id="@+id/tvCurrentTime"
             android:layout_width="wrap_content"
@@ -79,6 +98,24 @@
             android:text="00:00"
             android:textColor="#FFFFFF"
             android:textSize="12sp"
+            android:shadowColor="#000000"
+            android:shadowDx="0"
+            android:shadowDy="0"
+            android:shadowRadius="4" />
+
+        <!-- Tua tới 2.5 giây mỗi lần bấm - xem seekRelative() trong PlayerActivity.kt. -->
+        <TextView
+            android:id="@+id/btnSeekForward"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="⏩"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
             android:shadowColor="#000000"
             android:shadowDx="0"
             android:shadowDy="0"

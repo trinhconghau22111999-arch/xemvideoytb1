@@ -31,13 +31,29 @@ class PlayerActivity : AppCompatActivity() {
         // Độ chia nhỏ của SeekBar - dùng thang cố định (thay vì gán max = duration tính bằng mili
         // giây) để tránh phụ thuộc keeping-in-sync khi duration lớn, đồng thời kéo mượt hơn.
         private const val SEEKBAR_MAX = 1000
+
+        // File .mp4 gốc (sau khi giải mã từ .locked) do app quay màn hình lưu ra ĐÃ ở tốc độ 4x
+        // THẬT (xem RECORD_SPEED_FACTOR trong Y-utubecuatoi/MainActivity.kt + ScreenRecordService
+        // - quay nhanh 4x để tiết kiệm thời gian, KHÔNG kéo giãn PTS về lại 1x lúc lưu). Vì vậy
+        // viewer này phải CHỦ ĐỘNG chia tốc độ cho 4 để nhãn nút hiển thị đúng với tốc độ NỘI DUNG
+        // GỐC (thứ người xem thực sự quan tâm), không phải tốc độ thật của file:
+        //   nhãn "1x" (xem đúng tốc độ nội dung gốc)   -> tốc độ MediaPlayer thật = 1.0 / 4 = 0.25
+        //   nhãn "2x" (xem nhanh gấp đôi nội dung gốc) -> tốc độ MediaPlayer thật = 2.0 / 4 = 0.5
+        private const val SPEED_LABEL_1X = 0.25f
+        private const val SPEED_LABEL_2X = 0.5f
+
+        // Mỗi lần bấm nút tua lùi/tua tới là nhảy đúng 2.5 giây - tính trực tiếp trên đồng hồ
+        // của FILE đang phát (mp.currentPosition/duration), giống hệt cách tvCurrentTime/
+        // tvDuration/seekBar đang hiển thị - không quy đổi gì thêm ở đây, khác với tốc độ phát
+        // (SPEED_LABEL_1X/2X) vốn phải quy đổi vì đó là NHÃN tốc độ nội dung gốc.
+        private const val SEEK_STEP_MS = 2500
     }
 
     private var videoPath: String? = null
     private var mediaPlayer: MediaPlayer? = null
 
-    // Đã bỏ toàn bộ phần quy đổi tốc độ/thời lượng (không còn RECORD_SPEED_FACTOR/REAL_1X/
-    // REAL_2X) - phát trực tiếp file gốc, không quy đổi gì cả.
+    // is2x: nhãn tốc độ hiện tại đang hiển thị là "1x" hay "2x" (tốc độ NỘI DUNG GỐC, không phải
+    // tốc độ thật truyền cho MediaPlayer - xem SPEED_LABEL_1X/2X ở companion object).
     private var is2x = false
 
     private lateinit var videoView: VideoView
@@ -45,6 +61,8 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var seekBar: SeekBar
     private lateinit var tvCurrentTime: TextView
     private lateinit var tvDuration: TextView
+    private lateinit var btnSeekBack: TextView
+    private lateinit var btnSeekForward: TextView
 
     private val uiHandler = Handler(Looper.getMainLooper())
     // true khi người dùng đang kéo tay trên seekbar - lúc này KHÔNG được tự cập nhật progress
@@ -86,6 +104,8 @@ class PlayerActivity : AppCompatActivity() {
         seekBar = findViewById(R.id.seekBar)
         tvCurrentTime = findViewById(R.id.tvCurrentTime)
         tvDuration = findViewById(R.id.tvDuration)
+        btnSeekBack = findViewById(R.id.btnSeekBack)
+        btnSeekForward = findViewById(R.id.btnSeekForward)
 
         seekBar.max = SEEKBAR_MAX
 
@@ -111,6 +131,11 @@ class PlayerActivity : AppCompatActivity() {
             progressBar.visibility = View.GONE
             btnSpeed.alpha = 1f
             btnSpeed.isEnabled = true
+            // Mặc định phát ở nhãn "1x" (tốc độ MediaPlayer thật = 25% - xem SPEED_LABEL_1X) vì
+            // file gốc đã được quay ở 4x thật - không đặt mặc định thì video sẽ phát nhanh gấp 4
+            // ngay từ giây đầu tiên. Không báo lỗi nếu máy không hỗ trợ đổi tốc độ (rất hiếm) -
+            // im lặng phát ở tốc độ gốc còn hơn làm phiền bằng Toast ngay lúc mới mở video.
+            applySpeed(mp, SPEED_LABEL_1X)
             videoView.start()
             tvDuration.text = formatTime(mp.duration)
             uiHandler.post(progressUpdater)
@@ -127,6 +152,8 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         btnSpeed.setOnClickListener { toggleSpeed(btnSpeed) }
+        btnSeekBack.setOnClickListener { seekRelative(-SEEK_STEP_MS) }
+        btnSeekForward.setOnClickListener { seekRelative(SEEK_STEP_MS) }
 
         // Chạm vào khu vực video (ngoài thanh tiến độ) để: (1) hiện/ẩn thanh tiến độ, (2) tạm
         // dừng/tiếp tục phát - thay cho 3 nút tua lùi/play-pause/tua tới lớn ở giữa màn hình đã
@@ -152,6 +179,20 @@ class PlayerActivity : AppCompatActivity() {
             vv.start()
         }
         scheduleAutoHide()
+    }
+
+    // Bấm 1 cái là nhảy ngay deltaMs (âm = lùi, dương = tới) rồi cập nhật hiển thị NGAY LẬP TỨC
+    // (không đợi progressUpdater chạy vòng kế tiếp, tối đa PROGRESS_UPDATE_MS sau) để cảm giác
+    // bấm phát ăn liền, giống hệt cách onStopTrackingTouch() của seekBar đang làm.
+    private fun seekRelative(deltaMs: Int) {
+        val mp = mediaPlayer ?: return
+        val duration = mp.duration.coerceAtLeast(1)
+        val target = (mp.currentPosition + deltaMs).coerceIn(0, duration)
+        videoView.seekTo(target)
+        seekBar.progress = (target.toLong() * SEEKBAR_MAX / duration).toInt()
+        tvCurrentTime.text = formatTime(target)
+        // Hiện lại thanh (nếu đang ẩn) + gia hạn tự ẩn, giống mọi thao tác chạm khác trên màn hình.
+        showControls()
     }
 
     private fun setupSeekBar() {
@@ -225,12 +266,13 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     // Bấm 1 cái là chuyển thẳng sang tốc độ đó và phát tiếp luôn (không phải giữ nút) - bấm lại
-    // lần nữa để trả về 1x. Tốc độ ở đây là tốc độ THẬT của trình phát (1.0x/2.0x bình thường),
-    // không quy đổi gì thêm.
+    // lần nữa để trả về 1x. Nhãn hiển thị ("1x"/"2x") là tốc độ NỘI DUNG GỐC người xem cảm nhận -
+    // tốc độ THẬT truyền cho MediaPlayer đã được chia 4 (xem SPEED_LABEL_1X/2X) vì file đang phát
+    // vốn đã được quay nhanh 4x thật từ trước.
     private fun toggleSpeed(btnSpeed: TextView) {
         val mp = mediaPlayer ?: return
         val wantsIs2x = !is2x
-        val targetSpeed = if (wantsIs2x) 2.0f else 1.0f
+        val targetSpeed = if (wantsIs2x) SPEED_LABEL_2X else SPEED_LABEL_1X
         if (applySpeed(mp, targetSpeed)) {
             is2x = wantsIs2x
             btnSpeed.text = if (is2x) "1x" else "2x"
