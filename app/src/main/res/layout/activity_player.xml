@@ -16,9 +16,8 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center" />
 
-    <!-- Nút chuyển tốc độ phát - vị trí góc phải trên, cùng kiểu toạ độ (44dp vuông, cách trên
-         8dp, cách phải ~26dp) với ô vuông tải xuống ở app xem YouTube (xem
-         addDownloadOverlayButton() trong repo Y-utubecuatoi) để quen mắt, dễ bấm bằng ngón cái. -->
+    <!-- Nút chuyển tốc độ phát - nền đen đặc (bg_speed_button đã sửa), không tự ẩn theo
+         controlsBar - luôn hiện để dễ bấm bất kỳ lúc nào. -->
     <TextView
         android:id="@+id/btnSpeed"
         android:layout_width="44dp"
@@ -34,5 +33,57 @@
         android:textColor="#FFFFFF"
         android:textSize="14sp"
         android:textStyle="bold" />
+
+    <!-- Thanh tiến độ tự làm (thay cho MediaController mặc định của Android - loại bỏ hẳn 3 nút
+         tua lùi/play-pause/tua tới lớn ở giữa màn hình đi kèm nó). Nền TRONG SUỐT hoàn toàn (không
+         đặt màu nền) để không che video. Chạm vào video để hiện/ẩn thanh này - tự ẩn sau 3 giây
+         nếu không chạm/kéo gì thêm. -->
+    <LinearLayout
+        android:id="@+id/controlsBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@android:color/transparent"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/tvCurrentTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="00:00"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:shadowColor="#000000"
+            android:shadowDx="0"
+            android:shadowDy="0"
+            android:shadowRadius="4" />
+
+        <SeekBar
+            android:id="@+id/seekBar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:max="1000" />
+
+        <TextView
+            android:id="@+id/tvDuration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="00:00"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:shadowColor="#000000"
+            android:shadowDx="0"
+            android:shadowDy="0"
+            android:shadowRadius="4" />
+
+    </LinearLayout>
 
 </FrameLayout>
