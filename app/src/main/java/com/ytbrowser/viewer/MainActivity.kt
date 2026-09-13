@@ -32,7 +32,8 @@ import java.util.concurrent.Executors
 class MainActivity : AppCompatActivity() {
 
     // Phải khớp đúng thư mục mà ScreenRecordService (app quay màn hình) ghi file .locked vào -
-    // xem buildOutputPath() trong repo Y-utubecuatoi: Downloads/vdy/y.<n>.locked
+    // xem buildOutputPath() trong repo Y-utubecuatoi: Downloads/vdy/<tên video>.locked (hoặc
+    // "y.<n>.locked" khi không lấy được tiêu đề video hợp lệ).
     private val VIDEO_SUBFOLDER = "vdy"
 
     private lateinit var recyclerView: RecyclerView
