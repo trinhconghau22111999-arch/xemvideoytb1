@@ -9,6 +9,7 @@ import android.widget.MediaController
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.VideoView
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
 
@@ -22,43 +23,19 @@ class PlayerActivity : AppCompatActivity() {
     private var videoPath: String? = null
     private var mediaPlayer: MediaPlayer? = null
 
-    // QUAN TRỌNG: bản thân file video này được QUAY LÚC nguồn đang phát ở tốc độ 16x (xem
-    // "video.playbackRate = 16" trong app quay màn hình - repo Y-utubecuatoi/MainActivity.kt,
-    // hàm quay video màn hình - ĐÂY LÀ GIÁ TRỊ ĐANG DÙNG THẬT trong code quay hiện hành, KHÔNG
-    // PHẢI 8 hay 10 như trước - nếu bên quay đổi lại tốc độ khác thì PHẢI sửa lại đúng số này ở
-    // đây theo, nếu không tổng thời lượng/tua tới lui/nhãn 1x-2x sẽ lệch sai lần bằng đúng tỉ lệ
-    // giữa 2 số) - nội dung bên trong file đã bị "nén" thời gian lại 16 lần so với video gốc
-    // thật. Nếu phát file này ở đúng tốc độ chuẩn 1.0x của trình phát, mắt sẽ thấy nó chạy NHANH
-    // GẤP 16 LẦN so với video gốc trên YouTube. Muốn xem đúng bằng tốc độ thật của video gốc,
-    // trình phát phải chạy CHẬM LẠI đúng 16 lần: 1 ÷ 16 = 0.0625 - đây mới là tốc độ tương ứng
-    // với "1x" thật sự (không phải 1.0 của trình phát). "2x" (nhanh gấp đôi tốc độ thật) tương
-    // ứng 0.0625 × 2 = 0.125.
-    //
-    // Hệ số này (16) PHẢI khớp với tốc độ playbackRate đặt bên app quay (Y-utubecuatoi) - dùng
-    // chung 1 hằng số ở đây rồi suy ra REAL_1X/REAL_2X, đồng thời gán sang SpeedAdjustedVideoView
-    // (xem onCreate bên dưới) để tổng thời lượng + 2 nút tua tới/lui trên thanh điều khiển cũng
-    // tự quy đổi đúng theo thời gian thật, không còn tính theo thời gian gốc (đã nén) của file
-    // nữa.
-    private val RECORD_SPEED_FACTOR = 16
-    private val REAL_1X = 1f / RECORD_SPEED_FACTOR
-    private val REAL_2X = REAL_1X * 2f
-    // Mặc định LUÔN mở video ở tốc độ thật 1x (0.1x của trình phát) - "2x" chỉ là lựa chọn xem
-    // nhanh, bấm thêm mới bật.
+    // Đã bỏ toàn bộ phần quy đổi tốc độ/thời lượng (không còn RECORD_SPEED_FACTOR/REAL_1X/
+    // REAL_2X) - phát trực tiếp file gốc, không quy đổi gì cả. Tổng thời lượng, vị trí hiện tại,
+    // 2 nút tua tới/lui trên MediaController và nhãn tốc độ đều lấy/hiểu theo đúng dữ liệu gốc
+    // của file, không suy ra thời gian "thật" nào khác nữa.
     private var is2x = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
 
-        val videoView = findViewById<SpeedAdjustedVideoView>(R.id.videoView)
+        val videoView = findViewById<VideoView>(R.id.videoView)
         val progressBar = findViewById<ProgressBar>(R.id.progressBar)
         val btnSpeed = findViewById<TextView>(R.id.btnSpeed)
-
-        // Tổng thời lượng, vị trí hiện tại, và 2 nút tua tới/lui trên MediaController mặc định sẽ
-        // tự lấy qua getDuration()/getCurrentPosition()/seekTo() đã bị ghi đè trong
-        // SpeedAdjustedVideoView - gán hệ số NGAY TỪ ĐẦU (trước khi MediaController được tạo/dùng
-        // tới) để không có lúc nào các hàm đó vô tình trả về thời gian gốc (chưa quy đổi).
-        videoView.speedFactor = RECORD_SPEED_FACTOR
 
         videoPath = intent.getStringExtra(EXTRA_VIDEO_PATH)
         title = intent.getStringExtra(EXTRA_TITLE)
@@ -86,15 +63,6 @@ class PlayerActivity : AppCompatActivity() {
             btnSpeed.alpha = 1f
             btnSpeed.isEnabled = true
             videoView.start()
-            // Chỉnh ngay về tốc độ thật 1x (0.1x) - phải gọi SAU start() (đổi playbackParams
-            // lúc MediaPlayer đã chạy mới ổn định trên đa số thiết bị).
-            if (!applySpeed(mp, REAL_1X)) {
-                Toast.makeText(
-                    this,
-                    "Máy này không hỗ trợ phát chậm 1/$RECORD_SPEED_FACTOR - video có thể bị nhanh hơn tốc độ thật",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
         }
         videoView.setOnErrorListener { _, _, _ ->
             Toast.makeText(this, "Không phát được video này", Toast.LENGTH_SHORT).show()
@@ -109,12 +77,12 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     // Bấm 1 cái là chuyển thẳng sang tốc độ đó và phát tiếp luôn (không phải giữ nút) - bấm lại
-    // lần nữa để trả về 1x thật (0.1x). Nhãn trên nút luôn hiển thị tốc độ HIỆN TẠI đang phát
-    // (tính theo tốc độ THẬT của video gốc, không phải số nhân của trình phát).
+    // lần nữa để trả về 1x. Tốc độ ở đây là tốc độ THẬT của trình phát (1.0x/2.0x bình thường),
+    // không quy đổi gì thêm.
     private fun toggleSpeed(btnSpeed: TextView) {
         val mp = mediaPlayer ?: return
         val wantsIs2x = !is2x
-        val targetSpeed = if (wantsIs2x) REAL_2X else REAL_1X
+        val targetSpeed = if (wantsIs2x) 2.0f else 1.0f
         if (applySpeed(mp, targetSpeed)) {
             is2x = wantsIs2x
             btnSpeed.text = if (is2x) "1x" else "2x"
@@ -130,8 +98,6 @@ class PlayerActivity : AppCompatActivity() {
             if (wasPlaying && !mp.isPlaying) mp.start()
             true
         } catch (e: Exception) {
-            // Vài thiết bị/codec hiếm gặp không hỗ trợ tốc độ quá thấp (0.1x) hoặc đổi tốc độ
-            // giữa chừng - bỏ qua, không crash, giữ nguyên tốc độ đang phát.
             false
         }
     }
