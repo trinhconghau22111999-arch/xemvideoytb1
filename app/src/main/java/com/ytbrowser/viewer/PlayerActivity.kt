@@ -22,20 +22,20 @@ class PlayerActivity : AppCompatActivity() {
     private var videoPath: String? = null
     private var mediaPlayer: MediaPlayer? = null
 
-    // QUAN TRỌNG: bản thân file video này được QUAY LÚC nguồn đang phát ở tốc độ 10x (xem
-    // forceSpeed(10) trong app quay màn hình - repo Y-utubecuatoi, trước đây là 16x, đã đổi
-    // xuống 10x) - nội dung bên trong file đã bị "nén" thời gian lại 10 lần so với video gốc
-    // thật. Nếu phát file này ở đúng tốc độ chuẩn 1.0x của trình phát, mắt sẽ thấy nó chạy NHANH
-    // GẤP 10 LẦN so với video gốc trên YouTube. Muốn xem đúng bằng tốc độ thật của video gốc,
-    // trình phát phải chạy CHẬM LẠI đúng 10 lần: 1 ÷ 10 = 0.1 - đây mới là tốc độ tương ứng với
-    // "1x" thật sự (không phải 1.0 của trình phát). "2x" (nhanh gấp đôi tốc độ thật) tương ứng
-    // 0.1 × 2 = 0.2.
+    // QUAN TRỌNG: bản thân file video này được QUAY LÚC nguồn đang phát ở tốc độ 8x (xem
+    // RECORD_SPEED_FACTOR trong app quay màn hình - repo Y-utubecuatoi/MainActivity.kt, trước
+    // đây là 16x rồi 10x, nay giảm xuống 8x) - nội dung bên trong file đã bị "nén" thời gian lại
+    // 8 lần so với video gốc thật. Nếu phát file này ở đúng tốc độ chuẩn 1.0x của trình phát, mắt
+    // sẽ thấy nó chạy NHANH GẤP 8 LẦN so với video gốc trên YouTube. Muốn xem đúng bằng tốc độ
+    // thật của video gốc, trình phát phải chạy CHẬM LẠI đúng 8 lần: 1 ÷ 8 = 0.125 - đây mới là
+    // tốc độ tương ứng với "1x" thật sự (không phải 1.0 của trình phát). "2x" (nhanh gấp đôi tốc
+    // độ thật) tương ứng 0.125 × 2 = 0.25.
     //
-    // Hệ số này (10) PHẢI khớp với forceSpeed(...) bên app quay - dùng chung 1 hằng số ở đây rồi
-    // suy ra REAL_1X/REAL_2X, đồng thời gán sang SpeedAdjustedVideoView (xem onCreate bên dưới)
-    // để tổng thời lượng + 2 nút tua tới/lui trên thanh điều khiển cũng tự quy đổi đúng theo thời
-    // gian thật, không còn tính theo thời gian gốc (đã nén) của file nữa.
-    private val RECORD_SPEED_FACTOR = 10
+    // Hệ số này (8) PHẢI khớp với RECORD_SPEED_FACTOR bên app quay (Y-utubecuatoi) - dùng chung 1
+    // hằng số ở đây rồi suy ra REAL_1X/REAL_2X, đồng thời gán sang SpeedAdjustedVideoView (xem
+    // onCreate bên dưới) để tổng thời lượng + 2 nút tua tới/lui trên thanh điều khiển cũng tự quy
+    // đổi đúng theo thời gian thật, không còn tính theo thời gian gốc (đã nén) của file nữa.
+    private val RECORD_SPEED_FACTOR = 8
     private val REAL_1X = 1f / RECORD_SPEED_FACTOR
     private val REAL_2X = REAL_1X * 2f
     // Mặc định LUÔN mở video ở tốc độ thật 1x (0.1x của trình phát) - "2x" chỉ là lựa chọn xem
