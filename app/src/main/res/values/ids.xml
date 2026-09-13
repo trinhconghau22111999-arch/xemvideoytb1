@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dùng làm key gắn vào ImageView.setTag() để nhận biết ViewHolder có bị RecyclerView tái
+         sử dụng cho 1 file khác trong lúc ảnh preview đang được tạo ở luồng nền hay không -
+         tránh gán nhầm ảnh preview của video A vào ô đang hiển thị video B khi cuộn nhanh. -->
+    <item name="tag_thumb_key" type="id" />
+</resources>

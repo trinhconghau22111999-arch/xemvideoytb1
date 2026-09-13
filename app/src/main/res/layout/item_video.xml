@@ -11,9 +11,11 @@
     android:paddingBottom="14dp">
 
     <ImageView
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:src="@drawable/ic_play_circle"
+        android:id="@+id/ivThumb"
+        android:layout_width="112dp"
+        android:layout_height="64dp"
+        android:scaleType="centerCrop"
+        android:background="#333333"
         android:contentDescription="@null" />
 
     <LinearLayout

@@ -1,6 +1,10 @@
 package com.ytbrowser.viewer
 
 import android.content.Intent
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -10,6 +14,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
@@ -18,8 +23,10 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
 
@@ -168,6 +175,17 @@ class MainActivity : AppCompatActivity() {
 
         private var items: List<File> = emptyList()
 
+        // Cache bitmap trong RAM để cuộn qua lại danh sách không phải đọc lại ảnh preview từ
+        // đĩa mỗi lần - key = tên file + thời gian sửa đổi (đủ để nhận biết file có bị thay
+        // bằng bản khác trùng tên hay không).
+        private val memoryCache = LinkedHashMap<String, Bitmap>()
+
+        // Giới hạn số luồng giải mã/trích khung hình chạy song song (video .locked phải giải
+        // mã TOÀN BỘ file mới trích được khung hình - xem loadOrGenerateThumbnail()), nếu để
+        // mỗi ô danh sách tự chạy 1 Thread riêng thì khi cuộn nhanh có thể sinh ra hàng chục
+        // luồng giải mã cùng lúc, rất tốn CPU/pin. Dùng chung 1 pool nhỏ cho cả danh sách.
+        private val thumbExecutor = Executors.newFixedThreadPool(2)
+
         fun submitList(files: List<File>) {
             items = files
             notifyDataSetChanged()
@@ -185,6 +203,78 @@ class MainActivity : AppCompatActivity() {
             val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
             holder.tvMeta.text = String.format(Locale.getDefault(), "%.1f MB • %s", sizeMb, sdf.format(file.lastModified()))
             holder.itemView.setOnClickListener { onClick(file) }
+            bindThumbnail(holder, file)
+        }
+
+        private fun bindThumbnail(holder: ViewHolder, file: File) {
+            val cacheKey = "${file.name}_${file.lastModified()}"
+            // Gắn key vào tag để đối chiếu lại khi luồng nền tải xong - phòng trường hợp
+            // RecyclerView đã tái sử dụng ViewHolder này cho 1 file khác trong lúc đang chờ
+            // (tránh gán nhầm ảnh preview của video cũ vào ô đang hiển thị video mới).
+            holder.ivThumb.setTag(R.id.tag_thumb_key, cacheKey)
+
+            val cached = memoryCache[cacheKey]
+            if (cached != null) {
+                holder.ivThumb.setImageBitmap(cached)
+                return
+            }
+
+            holder.ivThumb.setImageDrawable(null)
+
+            val context = holder.itemView.context.applicationContext
+            thumbExecutor.execute {
+                val bmp = loadOrGenerateThumbnail(context, file, cacheKey)
+                if (bmp != null) {
+                    memoryCache[cacheKey] = bmp
+                    holder.ivThumb.post {
+                        if (holder.ivThumb.getTag(R.id.tag_thumb_key) == cacheKey) {
+                            holder.ivThumb.setImageBitmap(bmp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Video .locked bị mã hoá AES-256-CBC nên KHÔNG thể đọc trực tiếp 1 khung hình từ file
+        // gốc - phải giải mã ra file .mp4 tạm (giống hệt lúc phát video) rồi mới dùng
+        // MediaMetadataRetriever trích 1 khung hình làm ảnh đại diện. Ảnh trích ra được lưu lại
+        // vào cache riêng theo cacheKey để những lần mở lại danh sách sau không phải giải mã
+        // lại toàn bộ video chỉ để lấy ảnh preview.
+        private fun loadOrGenerateThumbnail(context: Context, file: File, cacheKey: String): Bitmap? {
+            val thumbDir = File(context.cacheDir, "thumbs").apply { mkdirs() }
+            val thumbFile = File(thumbDir, "$cacheKey.jpg")
+            if (thumbFile.exists()) {
+                BitmapFactory.decodeFile(thumbFile.absolutePath)?.let { return it }
+            }
+
+            val tempMp4 = File(
+                context.cacheDir,
+                "thumb_src_${System.currentTimeMillis()}_${Thread.currentThread().id}.mp4"
+            )
+            var retriever: MediaMetadataRetriever? = null
+            return try {
+                if (!VideoCrypto.decryptFile(file, tempMp4)) return null
+                retriever = MediaMetadataRetriever()
+                retriever.setDataSource(tempMp4.absolutePath)
+                val frame = retriever.getFrameAtTime(1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    ?: retriever.frameAtTime
+                if (frame != null) {
+                    try {
+                        FileOutputStream(thumbFile).use { out ->
+                            frame.compress(Bitmap.CompressFormat.JPEG, 80, out)
+                        }
+                    } catch (e: Exception) {
+                        // Không lưu được cache thì vẫn cứ hiển thị ảnh vừa trích được, chỉ là
+                        // lần mở lại sau sẽ phải giải mã lại thôi.
+                    }
+                }
+                frame
+            } catch (e: Exception) {
+                null
+            } finally {
+                retriever?.release()
+                tempMp4.delete()
+            }
         }
 
         override fun getItemCount(): Int = items.size
@@ -192,6 +282,7 @@ class MainActivity : AppCompatActivity() {
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val tvName: TextView = view.findViewById(R.id.tvName)
             val tvMeta: TextView = view.findViewById(R.id.tvMeta)
+            val ivThumb: ImageView = view.findViewById(R.id.ivThumb)
         }
     }
 }
