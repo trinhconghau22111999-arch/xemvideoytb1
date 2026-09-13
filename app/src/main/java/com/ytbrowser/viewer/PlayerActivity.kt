@@ -32,15 +32,18 @@ class PlayerActivity : AppCompatActivity() {
         // giây) để tránh phụ thuộc keeping-in-sync khi duration lớn, đồng thời kéo mượt hơn.
         private const val SEEKBAR_MAX = 1000
 
-        // File .mp4 gốc (sau khi giải mã từ .locked) do app quay màn hình lưu ra ĐÃ ở tốc độ 2x
-        // THẬT (xem RECORD_SPEED_FACTOR trong Y-utubecuatoi/MainActivity.kt - trước đây là 4x, đã
-        // đổi xuống 2x - quay nhanh 2x để tiết kiệm thời gian, KHÔNG kéo giãn PTS về lại 1x lúc
-        // lưu). Vì vậy viewer này phải CHỦ ĐỘNG chia tốc độ cho 2 để nhãn nút hiển thị đúng với
+        // File .mp4 gốc (sau khi giải mã từ .locked) do app quay màn hình lưu ra ĐÃ ở tốc độ 3x
+        // THẬT (xem RECORD_SPEED_FACTOR trong Y-utubecuatoi/MainActivity.kt - trước đây là 2x, đã
+        // NÂNG lên 3x - quay nhanh 3x để tiết kiệm thời gian, KHÔNG kéo giãn PTS về lại 1x lúc
+        // lưu). Vì vậy viewer này phải CHỦ ĐỘNG chia tốc độ cho 3 để nhãn nút hiển thị đúng với
         // tốc độ NỘI DUNG GỐC (thứ người xem thực sự quan tâm), không phải tốc độ thật của file:
-        //   nhãn "1x" (xem đúng tốc độ nội dung gốc)   -> tốc độ MediaPlayer thật = 1.0 / 2 = 0.5
-        //   nhãn "2x" (xem nhanh gấp đôi nội dung gốc) -> tốc độ MediaPlayer thật = 2.0 / 2 = 1.0
-        private const val SPEED_LABEL_1X = 0.5f
-        private const val SPEED_LABEL_2X = 1.0f
+        //   nhãn "1x" (xem đúng tốc độ nội dung gốc)   -> tốc độ MediaPlayer thật = 1.0 / 3 ≈ 0.333
+        //   nhãn "2x" (xem nhanh gấp đôi nội dung gốc) -> tốc độ MediaPlayer thật = 2.0 / 3 ≈ 0.667
+        // QUAN TRỌNG: RECORD_SPEED_FACTOR đổi bên app quay thì PHẢI đổi cả 2 hằng số này theo
+        // đúng công thức 1f/RECORD_SPEED_FACTOR và 2f/RECORD_SPEED_FACTOR - không tự đồng bộ 2
+        // chiều được vì đây là 2 project/app riêng biệt, không chia sẻ chung 1 hằng số.
+        private const val SPEED_LABEL_1X = 1f / 3f
+        private const val SPEED_LABEL_2X = 2f / 3f
 
         // Mỗi lần bấm nút tua lùi/tua tới là nhảy đúng 2.5 giây - tính trực tiếp trên đồng hồ
         // của FILE đang phát (mp.currentPosition/duration), giống hệt cách tvCurrentTime/
@@ -131,8 +134,8 @@ class PlayerActivity : AppCompatActivity() {
             progressBar.visibility = View.GONE
             btnSpeed.alpha = 1f
             btnSpeed.isEnabled = true
-            // Mặc định phát ở nhãn "1x" (tốc độ MediaPlayer thật = 50% - xem SPEED_LABEL_1X) vì
-            // file gốc đã được quay ở 2x thật - không đặt mặc định thì video sẽ phát nhanh gấp 2
+            // Mặc định phát ở nhãn "1x" (tốc độ MediaPlayer thật ≈ 33% - xem SPEED_LABEL_1X) vì
+            // file gốc đã được quay ở 3x thật - không đặt mặc định thì video sẽ phát nhanh gấp 3
             // ngay từ giây đầu tiên. Không báo lỗi nếu máy không hỗ trợ đổi tốc độ (rất hiếm) -
             // im lặng phát ở tốc độ gốc còn hơn làm phiền bằng Toast ngay lúc mới mở video.
             applySpeed(mp, SPEED_LABEL_1X)
@@ -267,8 +270,8 @@ class PlayerActivity : AppCompatActivity() {
 
     // Bấm 1 cái là chuyển thẳng sang tốc độ đó và phát tiếp luôn (không phải giữ nút) - bấm lại
     // lần nữa để trả về 1x. Nhãn hiển thị ("1x"/"2x") là tốc độ NỘI DUNG GỐC người xem cảm nhận -
-    // tốc độ THẬT truyền cho MediaPlayer đã được chia 2 (xem SPEED_LABEL_1X/2X) vì file đang phát
-    // vốn đã được quay nhanh 2x thật từ trước.
+    // tốc độ THẬT truyền cho MediaPlayer đã được chia 3 (xem SPEED_LABEL_1X/2X) vì file đang phát
+    // vốn đã được quay nhanh 3x thật từ trước.
     private fun toggleSpeed(btnSpeed: TextView) {
         val mp = mediaPlayer ?: return
         val wantsIs2x = !is2x
