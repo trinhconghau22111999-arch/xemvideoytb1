@@ -1,5 +1,6 @@
 package com.ytbrowser.viewer
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.Context
 import android.graphics.Bitmap
@@ -59,7 +60,7 @@ class MainActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progressBar)
 
         recyclerView.layoutManager = LinearLayoutManager(this)
-        adapter = VideoAdapter { playVideo(it) }
+        adapter = VideoAdapter(onClick = { playVideo(it) }, onDeleteClick = { confirmDelete(it) })
         recyclerView.adapter = adapter
 
         btnGrantPermission.setOnClickListener { ensurePermissionAndLoad() }
@@ -170,7 +171,36 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    class VideoAdapter(private val onClick: (File) -> Unit) :
+    private fun confirmDelete(file: File) {
+        AlertDialog.Builder(this)
+            .setTitle("Xoá video")
+            .setMessage("Bạn có chắc muốn xoá \"${file.name.removeSuffix(VideoCrypto.LOCKED_EXTENSION)}\"? Video sẽ bị xoá khỏi máy và không thể khôi phục.")
+            .setPositiveButton("Xoá") { _, _ -> deleteVideo(file) }
+            .setNegativeButton("Huỷ", null)
+            .show()
+    }
+
+    private fun deleteVideo(file: File) {
+        Thread {
+            file.delete()
+            // Dọn luôn ảnh preview đã cache riêng cho video này (tên cache = tên file gốc +
+            // "_" + thời điểm sửa đổi, xem loadOrGenerateThumbnail() trong VideoAdapter) - nếu
+            // không dọn thì cache sẽ tồn đọng mãi vì video đã bị xoá không còn ai xoá hộ nữa.
+            File(cacheDir, "thumbs").listFiles { f -> f.name.startsWith(file.name + "_") }
+                ?.forEach { it.delete() }
+
+            runOnUiThread {
+                adapter.removeFile(file)
+                if (adapter.itemCount == 0) {
+                    recyclerView.visibility = View.GONE
+                    tvEmpty.visibility = View.VISIBLE
+                    tvEmpty.text = "Chưa có video nào trong Downloads/$VIDEO_SUBFOLDER"
+                }
+            }
+        }.start()
+    }
+
+    class VideoAdapter(private val onClick: (File) -> Unit, private val onDeleteClick: (File) -> Unit) :
         RecyclerView.Adapter<VideoAdapter.ViewHolder>() {
 
         private var items: List<File> = emptyList()
@@ -203,7 +233,19 @@ class MainActivity : AppCompatActivity() {
             val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
             holder.tvMeta.text = String.format(Locale.getDefault(), "%.1f MB • %s", sizeMb, sdf.format(file.lastModified()))
             holder.itemView.setOnClickListener { onClick(file) }
+            holder.ivDelete.setOnClickListener { onDeleteClick(file) }
             bindThumbnail(holder, file)
+        }
+
+        // Gọi sau khi file đã bị xoá thật ở đĩa (xem deleteVideo() trong MainActivity) - chỉ lo
+        // phần cập nhật danh sách/cache trong bộ nhớ của adapter, không đụng tới việc xoá file.
+        fun removeFile(file: File) {
+            val index = items.indexOfFirst { it.absolutePath == file.absolutePath }
+            if (index == -1) return
+            items = items.toMutableList().also { it.removeAt(index) }
+            val prefix = "${file.name}_"
+            memoryCache.keys.filter { it.startsWith(prefix) }.forEach { memoryCache.remove(it) }
+            notifyItemRemoved(index)
         }
 
         private fun bindThumbnail(holder: ViewHolder, file: File) {
@@ -283,6 +325,7 @@ class MainActivity : AppCompatActivity() {
             val tvName: TextView = view.findViewById(R.id.tvName)
             val tvMeta: TextView = view.findViewById(R.id.tvMeta)
             val ivThumb: ImageView = view.findViewById(R.id.ivThumb)
+            val ivDelete: ImageView = view.findViewById(R.id.ivDelete)
         }
     }
 }

@@ -42,4 +42,14 @@
             android:textColor="#AAAAAA"
             android:textSize="13sp" />
     </LinearLayout>
+
+    <ImageView
+        android:id="@+id/ivDelete"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="4dp"
+        android:padding="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_delete"
+        android:contentDescription="Xoá video" />
 </LinearLayout>
