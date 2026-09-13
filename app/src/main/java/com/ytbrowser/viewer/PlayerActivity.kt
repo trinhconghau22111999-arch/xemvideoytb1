@@ -284,7 +284,12 @@ class PlayerActivity : AppCompatActivity() {
     private fun applySpeed(mp: MediaPlayer, speed: Float): Boolean {
         return try {
             val wasPlaying = mp.isPlaying
-            mp.playbackParams = PlaybackParams().setSpeed(speed)
+            // QUAN TRỌNG: phải set CẢ pitch = 1f, không chỉ speed. Nếu chỉ setSpeed() mà bỏ
+            // trống pitch, nhiều máy/thiết bị KHÔNG tự dùng thuật toán giữ nguyên cao độ
+            // (time-stretch) mà để cao độ trôi theo tốc độ luôn - phát chậm (0.25x/0.5x) thì
+            // giọng bị kéo trầm xuống nghe "ma quái", không bình thường. Set pitch=1f ép hệ
+            // thống luôn giữ đúng cao độ gốc bất kể tốc độ phát nhanh/chậm bao nhiêu.
+            mp.playbackParams = PlaybackParams().setSpeed(speed).setPitch(1f)
             if (wasPlaying && !mp.isPlaying) mp.start()
             true
         } catch (e: Exception) {
